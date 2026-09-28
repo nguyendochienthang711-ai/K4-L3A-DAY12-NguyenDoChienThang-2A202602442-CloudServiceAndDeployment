@@ -59,24 +59,39 @@ def _get_env_val(key: str, default: str = "") -> str:
 
 def _call_gemini_api(question: str, history: list[dict] | None = None) -> dict | None:
     """Gọi Google Gemini API nếu có GEMINI_API_KEY trong env."""
-    api_key = _get_env_val("GEMINI_API_KEY")
+    api_key = _get_env_val("GEMINI_API_KEY") or _get_env_val("GOOGLE_API_KEY")
     model = _get_env_val("LLM_MODEL", "gemini-3.5-flash-lite")
     if not api_key:
+        print("[GEMINI] No GEMINI_API_KEY or GOOGLE_API_KEY found in environment!", flush=True)
         return None
 
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
 
+    # Chuẩn hóa lịch sử: Bắt đầu bằng user, xen kẽ user <-> model, không lặp role
     contents = []
+    last_role = None
     if history:
         for turn in history:
             role = "model" if turn.get("role") == "assistant" else "user"
-            content = turn.get("content", "")
-            if content:
-                contents.append({"role": role, "parts": [{"text": str(content)}]})
-    contents.append({"role": "user", "parts": [{"text": str(question)}]})
+            text = str(turn.get("content", "")).strip()
+            if not text:
+                continue
+            if not contents and role == "model":
+                continue
+            if role == last_role and contents:
+                contents[-1]["parts"][0]["text"] += f"\n{text}"
+            else:
+                contents.append({"role": role, "parts": [{"text": text}]})
+                last_role = role
+
+    q_text = str(question).strip()
+    if last_role == "user" and contents:
+        contents[-1]["parts"][0]["text"] += f"\n{q_text}"
+    else:
+        contents.append({"role": "user", "parts": [{"text": q_text}]})
 
     try:
-        with httpx.Client(timeout=15.0) as client:
+        with httpx.Client(timeout=30.0) as client:
             resp = client.post(
                 url,
                 json={"contents": contents},
@@ -101,8 +116,12 @@ def _call_gemini_api(question: str, history: list[dict] | None = None) -> dict |
                         "tokens_out": tokens_out,
                         "cost_usd": round(cost, 8),
                     }
-    except Exception:
-        pass
+                else:
+                    print(f"[GEMINI] No candidates returned: {data}", flush=True)
+            else:
+                print(f"[GEMINI_HTTP_ERROR] Status {resp.status_code}: {resp.text}", flush=True)
+    except Exception as exc:
+        print(f"[GEMINI_EXCEPTION] {type(exc).__name__}: {exc}", flush=True)
     return None
 
 
