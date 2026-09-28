@@ -198,6 +198,16 @@ def ask(
     }
 
 
+@app.post("/clear")
+def clear_history(
+    user_id: str = Depends(verify_api_key),
+    store: ConversationStore = Depends(get_store),
+):
+    """Xóa lịch sử hội thoại trong Redis của user."""
+    store.clear(user_id)
+    return {"status": "ok", "message": f"Cleared history for {user_id}"}
+
+
 if __name__ == "__main__":
     import uvicorn
 

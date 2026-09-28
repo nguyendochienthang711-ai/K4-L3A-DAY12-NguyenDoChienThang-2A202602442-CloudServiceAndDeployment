@@ -230,6 +230,27 @@
       opacity: 0.5;
       cursor: not-allowed;
     }
+
+    .clear-btn {
+      background-color: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.35);
+      color: #fca5a5;
+      padding: 5px 11px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.2s;
+    }
+
+    .clear-btn:hover {
+      background-color: rgba(239, 68, 68, 0.28);
+      color: #ffffff;
+      border-color: rgba(239, 68, 68, 0.6);
+    }
   </style>
 </head>
 <body>
@@ -240,7 +261,12 @@
         <span class="status-dot"></span>
         <h1>AI Agent Assistant</h1>
       </div>
-      <div class="header-badge">Production Live</div>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <button class="clear-btn" id="clearBtn" title="Xóa lịch sử trò chuyện trong Redis và làm mới session">
+          🗑️ Xóa Redis Cache
+        </button>
+        <div class="header-badge">Production Live</div>
+      </div>
     </div>
 
     <div class="messages-area" id="messagesArea">
@@ -271,20 +297,62 @@
   </div>
 
   <script>
-    // Cấu hình ngầm định, hoàn toàn không hiển thị trên giao diện
+    // Quản lý userId động theo session người dùng (tránh xung đột lịch sử rác cũ)
+    let currentUserId = localStorage.getItem("chat_uid");
+    if (!currentUserId || currentUserId === "user_vip") {
+      currentUserId = "user_" + Math.random().toString(36).substring(2, 9);
+      localStorage.setItem("chat_uid", currentUserId);
+    }
+
     const CONFIG = {
       apiKey: "{{AGENT_API_KEY}}",
-      userId: "user_vip",
-      // Tự động dùng URL tương đối nếu mở qua web server, hoặc dùng Render URL nếu mở file trực tiếp
       endpoint: window.location.origin.startsWith("http") 
         ? `${window.location.origin}/ask` 
-        : "https://k4-l3a-day12-nguyendochienthang.onrender.com/ask"
+        : "https://k4-l3a-day12-nguyendochienthang.onrender.com/ask",
+      clearEndpoint: window.location.origin.startsWith("http") 
+        ? `${window.location.origin}/clear` 
+        : "https://k4-l3a-day12-nguyendochienthang.onrender.com/clear"
     };
 
     const messagesArea = document.getElementById("messagesArea");
     const chatForm = document.getElementById("chatForm");
     const questionInput = document.getElementById("questionInput");
     const sendBtn = document.getElementById("sendBtn");
+    const clearBtn = document.getElementById("clearBtn");
+
+    // Xử lý xóa lịch sử Redis Cache
+    clearBtn.addEventListener("click", async () => {
+      if (!confirm("Bạn có chắc chắn muốn xóa toàn bộ lịch sử trò chuyện trong Redis không?")) return;
+      clearBtn.disabled = true;
+      clearBtn.textContent = "⏳ Đang xóa...";
+      try {
+        for (const uid of [currentUserId, "user_vip"]) {
+          await fetch(CONFIG.clearEndpoint, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-API-Key": CONFIG.apiKey,
+              "X-User-Id": uid
+            }
+          }).catch(() => {});
+        }
+        currentUserId = "user_" + Math.random().toString(36).substring(2, 9);
+        localStorage.setItem("chat_uid", currentUserId);
+
+        messagesArea.innerHTML = `
+          <div class="message assistant">
+            <div class="bubble">
+              ✅ Đã xóa sạch bộ nhớ Redis! Bạn có thể bắt đầu cuộc trò chuyện mới với AI.
+            </div>
+          </div>
+        `;
+      } catch (err) {
+        alert("Lỗi khi xóa bộ nhớ Redis: " + err);
+      } finally {
+        clearBtn.disabled = false;
+        clearBtn.textContent = "🗑️ Xóa Redis Cache";
+      }
+    });
 
     function scrollToBottom() {
       messagesArea.scrollTop = messagesArea.scrollHeight;
@@ -347,7 +415,7 @@
           headers: {
             "Content-Type": "application/json",
             "X-API-Key": CONFIG.apiKey,
-            "X-User-Id": CONFIG.userId,
+            "X-User-Id": currentUserId,
           },
           body: JSON.stringify({ question }),
         });
