@@ -38,6 +38,7 @@ RUN useradd --create-home --uid 10001 appuser
 
 COPY app ./app
 COPY utils ./utils
+COPY chat.html .
 
 USER appuser
 
