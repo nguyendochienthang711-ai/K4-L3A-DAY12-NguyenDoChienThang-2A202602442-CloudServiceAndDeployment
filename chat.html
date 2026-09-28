@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Agent Assistant</title>
+  <style>
+    :root {
+      --bg-color: #0f172a;
+      --panel-bg: #1e293b;
+      --border-color: #334155;
+      --text-main: #f8fafc;
+      --text-sub: #94a3b8;
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --user-bubble: #2563eb;
+      --agent-bubble: #334155;
+      --error-color: #ef4444;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 16px;
+    }
+
+    .chat-container {
+      width: 100%;
+      max-width: 800px;
+      height: 90vh;
+      background-color: var(--panel-bg);
+      border-radius: 16px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
+      border: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .chat-header {
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background-color: rgba(15, 23, 42, 0.6);
+    }
+
+    .header-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      background-color: #10b981;
+      border-radius: 50%;
+      box-shadow: 0 0 8px #10b981;
+    }
+
+    .header-title h1 {
+      font-size: 1.15rem;
+      font-weight: 600;
+    }
+
+    .header-badge {
+      font-size: 0.75rem;
+      background-color: rgba(59, 130, 246, 0.15);
+      color: #60a5fa;
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      padding: 4px 10px;
+      border-radius: 9999px;
+    }
+
+    .messages-area {
+      flex: 1;
+      padding: 24px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .message {
+      display: flex;
+      flex-direction: column;
+      max-width: 80%;
+      animation: fadeIn 0.25s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .message.user {
+      align-self: flex-end;
+    }
+
+    .message.assistant {
+      align-self: flex-start;
+    }
+
+    .bubble {
+      padding: 12px 18px;
+      border-radius: 16px;
+      font-size: 0.95rem;
+      line-height: 1.5;
+      word-break: break-word;
+    }
+
+    .message.user .bubble {
+      background-color: var(--user-bubble);
+      color: #ffffff;
+      border-bottom-right-radius: 4px;
+    }
+
+    .message.assistant .bubble {
+      background-color: var(--agent-bubble);
+      color: var(--text-main);
+      border-bottom-left-radius: 4px;
+      border: 1px solid var(--border-color);
+    }
+
+    .meta-info {
+      font-size: 0.72rem;
+      color: var(--text-sub);
+      margin-top: 5px;
+      display: flex;
+      gap: 10px;
+    }
+
+    .message.user .meta-info {
+      justify-content: flex-end;
+    }
+
+    .typing-indicator {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 12px 18px;
+      background-color: var(--agent-bubble);
+      border-radius: 16px;
+      border-bottom-left-radius: 4px;
+      width: fit-content;
+    }
+
+    .typing-dot {
+      width: 7px;
+      height: 7px;
+      background-color: var(--text-sub);
+      border-radius: 50%;
+      animation: bounce 1.4s infinite ease-in-out both;
+    }
+
+    .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+    .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+
+    @keyframes bounce {
+      0%, 80%, 100% { transform: scale(0); }
+      40% { transform: scale(1); }
+    }
+
+    .input-area {
+      padding: 16px 20px;
+      border-top: 1px solid var(--border-color);
+      background-color: rgba(15, 23, 42, 0.4);
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .input-box {
+      flex: 1;
+      background-color: rgba(15, 23, 42, 0.8);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 12px 16px;
+      color: var(--text-main);
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .input-box:focus {
+      border-color: var(--primary);
+    }
+
+    .input-box::placeholder {
+      color: #64748b;
+    }
+
+    .send-btn {
+      background-color: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 12px;
+      padding: 12px 22px;
+      font-size: 0.95rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background-color 0.2s, transform 0.1s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .send-btn:hover {
+      background-color: var(--primary-hover);
+    }
+
+    .send-btn:active {
+      transform: scale(0.98);
+    }
+
+    .send-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="chat-container">
+    <div class="chat-header">
+      <div class="header-title">
+        <span class="status-dot"></span>
+        <h1>AI Agent Assistant</h1>
+      </div>
+      <div class="header-badge">Production Live</div>
+    </div>
+
+    <div class="messages-area" id="messagesArea">
+      <div class="message assistant">
+        <div class="bubble">
+          Xin chào! Tôi là trợ lý AI Agent. Tôi có thể hỗ trợ gì cho bạn hôm nay?
+        </div>
+      </div>
+    </div>
+
+    <form class="input-area" id="chatForm">
+      <input 
+        type="text" 
+        id="questionInput" 
+        class="input-box" 
+        placeholder="Nhập câu hỏi của bạn..." 
+        autocomplete="off"
+        required
+      />
+      <button type="submit" class="send-btn" id="sendBtn">
+        Gửi
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="22" y1="2" x2="11" y2="13"></line>
+          <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+        </svg>
+      </button>
+    </form>
+  </div>
+
+  <script>
+    // Cấu hình ngầm định, hoàn toàn không hiển thị trên giao diện
+    const CONFIG = {
+      apiKey: "{{AGENT_API_KEY}}",
+      userId: "user_vip",
+      // Tự động dùng URL tương đối nếu mở qua web server, hoặc dùng Render URL nếu mở file trực tiếp
+      endpoint: window.location.origin.startsWith("http") 
+        ? `${window.location.origin}/ask` 
+        : "https://k4-l3a-day12-nguyendochienthang.onrender.com/ask"
+    };
+
+    const messagesArea = document.getElementById("messagesArea");
+    const chatForm = document.getElementById("chatForm");
+    const questionInput = document.getElementById("questionInput");
+    const sendBtn = document.getElementById("sendBtn");
+
+    function scrollToBottom() {
+      messagesArea.scrollTop = messagesArea.scrollHeight;
+    }
+
+    function appendMessage(text, role, meta = null) {
+      const msgDiv = document.createElement("div");
+      msgDiv.className = `message ${role}`;
+
+      const bubbleDiv = document.createElement("div");
+      bubbleDiv.className = "bubble";
+      bubbleDiv.textContent = text;
+      msgDiv.appendChild(bubbleDiv);
+
+      if (meta) {
+        const metaDiv = document.createElement("div");
+        metaDiv.className = "meta-info";
+        metaDiv.textContent = meta;
+        msgDiv.appendChild(metaDiv);
+      }
+
+      messagesArea.appendChild(msgDiv);
+      scrollToBottom();
+    }
+
+    function showTyping() {
+      const typingDiv = document.createElement("div");
+      typingDiv.className = "message assistant";
+      typingDiv.id = "typingIndicator";
+      typingDiv.innerHTML = `
+        <div class="typing-indicator">
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+        </div>
+      `;
+      messagesArea.appendChild(typingDiv);
+      scrollToBottom();
+    }
+
+    function hideTyping() {
+      const typingDiv = document.getElementById("typingIndicator");
+      if (typingDiv) typingDiv.remove();
+    }
+
+    chatForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const question = questionInput.value.trim();
+      if (!question) return;
+
+      appendMessage(question, "user");
+      questionInput.value = "";
+      questionInput.disabled = true;
+      sendBtn.disabled = true;
+      showTyping();
+
+      try {
+        const response = await fetch(CONFIG.endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-API-Key": CONFIG.apiKey,
+            "X-User-Id": CONFIG.userId,
+          },
+          body: JSON.stringify({ question }),
+        });
+
+        hideTyping();
+
+        if (response.status === 429) {
+          appendMessage("⚠️ Bạn đang gửi câu hỏi quá nhanh. Vui lòng đợi một lát!", "assistant");
+        } else if (response.status === 402) {
+          appendMessage("⚠️ Tài khoản đã sử dụng hết ngân sách tháng.", "assistant");
+        } else if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          appendMessage(`Lỗi (${response.status}): ${errData.detail || "Không thể kết nối tới server"}`, "assistant");
+        } else {
+          const data = await response.json();
+          const metaText = data.tokens 
+            ? `Tokens: ${data.tokens.in + data.tokens.out} | Chi phí: $${data.cost_usd.toFixed(4)}`
+            : "";
+          appendMessage(data.answer, "assistant", metaText);
+        }
+      } catch (err) {
+        hideTyping();
+        appendMessage("Không thể kết nối đến máy chủ AI Agent. Vui lòng thử lại sau.", "assistant");
+      } finally {
+        questionInput.disabled = false;
+        sendBtn.disabled = false;
+        questionInput.focus();
+      }
+    });
+  </script>
+</body>
+</html>
